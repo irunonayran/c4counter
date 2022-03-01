@@ -9,15 +9,14 @@ Options:
     --c4 <C4.fasta>  path to a fasta file of C4 [default: C4A.fa]
 """
 
-from Bio.SeqRecord import SeqRecord
 import docopt
 import paf
 import minimapcut
 import enum
 from pathlib import Path
 from collections import namedtuple
-from Bio import SeqIO
-from Bio.Seq import Seq
+from Bio import SeqIO, Seq
+import sys
 
 # in coordinates of C4A with HERV
 END_EXON_9 = 2351
@@ -36,12 +35,12 @@ def groupSegments(mappings: list[paf.PafEntry]) -> list[list[paf.PafEntry]]:
     mappings = sortedByTargetCoords(mappings)
     groups = []
     currentGroup = []
-    prev_end = 0
+    prev_qend = 0
     for seg in mappings:
-        if seg.qstart < prev_end:
+        if seg.qstart < prev_qend:
             groups.append(currentGroup)
             currentGroup = []
-        prev_end = seg.qend
+        prev_qend = seg.qend
         currentGroup.append(seg)
     groups.append(currentGroup)
     return groups
@@ -68,7 +67,7 @@ def readFirstFastaSeq(fastapath: Path) -> SeqIO.SeqRecord:
 
 def extractEx26ToFile(C4fasta: Path, outfasta: Path):
     C4rec = readFirstFastaSeq(C4fasta)
-    ex26rec = SeqRecord(
+    ex26rec = SeqIO.SeqRecord(
         C4rec.seq[START_EXON_26 + 1 : END_EXON_26 + 1],
         id="NC_000006.12:31995955-31996111",
         description="C4_exon26 [organism=Homo sapiens]",
@@ -90,8 +89,8 @@ def inferHaplotype(
     ex26start, ex26end = minimapcut.getAlignmentCoords(tmpC4Fasta, ex26fasta.as_posix())
     c4rec = readFirstFastaSeq(tmpC4Fasta)
     ex26seq = c4rec.seq[ex26start:ex26end]
-    c4aMarker = Seq("PCPVLD")
-    c4bMarker = Seq("LSPVIH")
+    c4aMarker = Seq.Seq("PCPVLD")
+    c4bMarker = Seq.Seq("LSPVIH")
     ex26pep = ex26seq.translate()
     if c4aMarker in ex26pep and not c4bMarker in ex26pep:
         return Haplotype.C4A
@@ -162,14 +161,18 @@ def main():
     c4a_fasta = arguments["--c4"]
     for ref_fasta in arguments["<references.fasta>"]:
         c4Segments = minimapcut.align(ref_fasta, c4a_fasta)
-        c4Groups = groupSegments(c4Segments)
         print("########################################")
         print(f"{ref_fasta}")
+        if not c4Segments:
+            print("\tno C4 mappings found by minimap")
+            continue
+        c4Groups = groupSegments(c4Segments)
         c4s = []
         for (i, c4) in enumerate(c4Groups):
-            if c4[-1].tend - c4[0].tstart < 0.5 * LENGTH_C4A:
-                continue
             print(f"{i+1}")
+            if c4[-1].tend - c4[0].tstart < 0.5 * LENGTH_C4A:
+                print("\tC4 mapping too small... skipping")
+                continue
             # print( "    " + str(c4))
             print(f"    start: {c4[0].tstart}")
             print(f"    end  : {c4[-1].tend}")
