@@ -17,36 +17,43 @@ import docopt
 import subprocess
 import paf
 
+
 def sortedByTargetCoords(segments: list[paf.PafEntry]):
     return sorted(segments, key=lambda segment: segment.tstart)
 
+
 def findBestMatch(segments: list[paf.PafEntry]):
-    completeMatches = [ seg for seg in segments if seg.qstart==0 and seg.qend==seg.qlen ]
+    completeMatches = [
+        seg for seg in segments if seg.qstart == 0 and seg.qend == seg.qlen
+    ]
     if not completeMatches:
         return None
-    if len(completeMatches) > 2 :
+    if len(completeMatches) > 2:
         completeMatches.sort(key=lambda segment: segment.quality, reverse=True)
     return completeMatches[0]
 
 
-
-def align(reffasta:str, queryfasta:str, verbose=False) -> list[paf.PafEntry]:
+def align(reffasta: str, queryfasta: str, verbose=False) -> list[paf.PafEntry]:
     command = ["minimap2", "-c", "-p 0.1", reffasta, queryfasta]
     output = subprocess.run(command, capture_output=True)
-    segments =[]
+    segments = []
     if verbose:
         print(" ".join(command))
-    for line in output.stdout.decode("utf-8").split('\n'):
+    for line in output.stdout.decode("utf-8").split("\n"):
         line.strip()
         if not line:
             continue
         if verbose:
             print(line)
         parsed = paf.parsePafEntry(line)
-        segments.append(parsed)
+        if parsed:
+            segments.append(parsed)
     return segments
 
-def getAlignmentCoords(reffasta:str, queryfasta:str, verbose=False) -> tuple[int, int]:
+
+def getAlignmentCoords(
+    reffasta: str, queryfasta: str, verbose=False
+) -> tuple[int, int]:
     segments = align(reffasta, queryfasta, verbose=verbose)
     bestMatch = findBestMatch(segments)
     if bestMatch:
@@ -56,28 +63,32 @@ def getAlignmentCoords(reffasta:str, queryfasta:str, verbose=False) -> tuple[int
         if segments:
             return segments[0].tstart, segments[-1].tend
         else:
-            return 0,0
+            return 0, 0
+
 
 def extractRange(reffasta: str, start: int, end: int, destfile=""):
     appendage = "_sub"
     for seq_record in SeqIO.parse(reffasta, "fasta"):
         sub_record = seq_record[start:end]
         path, ext = os.path.splitext(reffasta)
-        fname = path + appendage + ext if destfile=="" else destfile
-        with open(fname, 'w') as subfasta:
+        fname = path + appendage + ext if destfile == "" else destfile
+        with open(fname, "w") as subfasta:
             subfasta.write(sub_record.format("fasta"))
         break
 
+
 if __name__ == "__main__":
     args = docopt.docopt(__doc__, version="0.1")
-    start1, end1 = getAlignmentCoords(args["<reference.fasta>"], args["<query.fasta>"], verbose=True)
+    start1, end1 = getAlignmentCoords(
+        args["<reference.fasta>"], args["<query.fasta>"], verbose=True
+    )
     offset1 = int(float(args["--offset1"])) if args["--offset1"] else 0
     offset2 = int(float(args["--offset2"])) if args["--offset2"] else 0
     if args["<query_end.fasta>"]:
-        start2, end2 = getAlignmentCoords(args["<reference.fasta>"], args["<query_end.fasta>"], verbose=True)
+        start2, end2 = getAlignmentCoords(
+            args["<reference.fasta>"], args["<query_end.fasta>"], verbose=True
+        )
         extractRange(args["<reference.fasta>"], start1 + offset1, end2 + offset2)
     else:
         extractRange(args["<reference.fasta>"], start1 + offset1, end1 + offset2)
     print()
-
-
