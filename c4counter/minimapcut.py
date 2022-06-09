@@ -15,7 +15,7 @@ from Bio import SeqIO
 import os
 import docopt
 import subprocess
-import paf
+from c4counter import paf
 
 
 def sortedByTargetCoords(segments: list[paf.PafEntry]):

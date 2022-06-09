@@ -3,18 +3,17 @@
 returns the number and types of C4 regions. minimap2 is used for mapping
 
 Usage:
-    c4counter [--c4 <C4.fasta>] <references.fasta> ...
-
-Options:
-    --c4 <C4.fasta>  path to a fasta file of C4 [default: C4A.fa]
+    c4counter <references.fasta> ...
 """
 
 import docopt
-import paf
-import minimapcut
+from c4counter import paf
+from c4counter import minimapcut
 import enum
 from pathlib import Path
 from collections import namedtuple
+from importlib import resources
+import c4counter.data
 from Bio import SeqIO, Seq
 import sys
 
@@ -158,7 +157,7 @@ def write_svg(faToC4: dict[str, C4Mapped]):
 def main():
     arguments = docopt.docopt(__doc__, version="0.1")
     faToC4 = {}
-    c4a_fasta = arguments["--c4"]
+    c4a_fasta = resources.path(c4counter.data, 'C4A.fa')
     for ref_fasta in arguments["<references.fasta>"]:
         c4Segments = minimapcut.align(ref_fasta, c4a_fasta)
         print("########################################")
